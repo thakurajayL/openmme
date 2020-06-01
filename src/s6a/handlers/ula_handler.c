@@ -5,17 +5,6 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *	http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 #include <stdlib.h>
@@ -182,16 +171,18 @@ parse_ula_subscription_data(struct avp *avp_ptr, struct ula_Q_msg *ula)
 							log_msg(LOG_INFO, "APN length recvd from hss - %lu\n",
 									apn_cfg_element->avp_value->os.len);
 
-							// TODO will push another patch to extend
-							// message Q to use the code blow
-							/*
-							memcpy(ula->apn.val,
+							memcpy(ula->selected_apn.val,
 									apn_cfg_element->avp_value->os.data,
 									apn_cfg_element->avp_value->os.len);
-							ula->apn.len = apn_cfg_element->avp_value->os.len;
-							*/
+							ula->selected_apn.len =
+									apn_cfg_element->avp_value->os.len;
 						}
-
+						if (848 == apn_cfg_element->avp_code && ula->static_addr == 0){
+							struct sockaddr_in  temp;
+							int result = fd_dictfct_Address_interpret(apn_cfg_element->avp_value, &temp);
+							log_msg(LOG_INFO, "Served IP address found %d %s \n", result, inet_ntoa(temp.sin_addr)); 
+							ula->static_addr = temp.sin_addr.s_addr; /* network order */ 
+						}
 						apn_cfg_prof_itr = apn_cfg_itr;
 
 						CHECK_FCT_DO(fd_msg_browse(apn_cfg_itr, MSG_BRW_NEXT,
@@ -229,7 +220,7 @@ ula_resp_callback(struct msg **buf, struct avp *avp_ptr, struct session *sess,
 {
 	int sess_id_len, ue_idx;
 	unsigned char *sess_id= NULL;
-	struct ula_Q_msg ula;
+	struct ula_Q_msg ula = {0};
 	struct avp *subsc_ptr = NULL;
 
 	CHECK_FCT_DO(fd_sess_getsid(sess, &sess_id, (size_t*)&sess_id_len),
